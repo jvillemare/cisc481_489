@@ -195,7 +195,7 @@ class CSP:
         :param cell_id:
         :return:
         """
-        if self.size == 4:
+        if self.size == 4: # 4x4 neighbors
             top_left = [
                 'C11', 'C12',
                 'C21', 'C22'
@@ -231,22 +231,111 @@ class CSP:
                 'C44': bottom_right
             }
             return resolution[cell_id]
+        elif self.size == 9: # 9x9 neighbors
+            top_left = [
+                'C11', 'C12', 'C13',
+                'C21', 'C22', 'C23',
+                'C31', 'C32', 'C33'
+            ]
+            top_middle = [
+                'C14', 'C15', 'C16',
+                'C24', 'C25', 'C26',
+                'C34', 'C35', 'C36'
+            ]
+            top_right = [
+                'C17', 'C18', 'C19',
+                'C27', 'C28', 'C29',
+                'C37', 'C38', 'C39'
+            ]
+            middle_left = [
+                'C41', 'C42', 'C43',
+                'C51', 'C52', 'C53',
+                'C61', 'C62', 'C63'
+            ]
+            middle_middle = [
+                'C44', 'C45', 'C46',
+                'C54', 'C55', 'C56',
+                'C64', 'C65', 'C66'
+            ]
+            middle_right = [
+                'C47', 'C48', 'C49',
+                'C57', 'C58', 'C59',
+                'C67', 'C68', 'C69'
+            ]
+            bottom_left = [
+                'C71', 'C72', 'C73',
+                'C81', 'C82', 'C83',
+                'C91', 'C92', 'C93'
+            ]
+            bottom_middle = [
+                'C74', 'C75', 'C76',
+                'C84', 'C85', 'C86',
+                'C94', 'C95', 'C96'
+            ]
+            bottom_right = [
+                'C77', 'C78', 'C79',
+                'C87', 'C88', 'C89',
+                'C97', 'C98', 'C99'
+            ]
+            resolution = {
+                # top_left
+                'C11': top_left, 'C12': top_left, 'C13': top_left,
+                'C21': top_left, 'C22': top_left, 'C23': top_left,
+                'C31': top_left, 'C32': top_left, 'C33': top_left,
+                # top_middle
+                'C14': top_middle, 'C15': top_middle, 'C16': top_middle,
+                'C24': top_middle, 'C25': top_middle, 'C26': top_middle,
+                'C34': top_middle, 'C35': top_middle, 'C36': top_middle,
+                # top_right
+                'C17': top_right, 'C18': top_right, 'C19': top_right,
+                'C27': top_right, 'C28': top_right, 'C29': top_right,
+                'C37': top_right, 'C38': top_right, 'C39': top_right,
+                # middle_left
+                'C41': middle_left, 'C42': middle_left, 'C43': middle_left,
+                'C51': middle_left, 'C52': middle_left, 'C53': middle_left,
+                'C61': middle_left, 'C62': middle_left, 'C63': middle_left,
+                # middle_middle
+                'C44': middle_middle, 'C45': middle_middle, 'C46': middle_middle,
+                'C54': middle_middle, 'C55': middle_middle, 'C56': middle_middle,
+                'C64': middle_middle, 'C65': middle_middle, 'C66': middle_middle,
+                # middle_right
+                'C47': middle_right, 'C48': middle_right, 'C49': middle_right,
+                'C57': middle_right, 'C58': middle_right, 'C59': middle_right,
+                'C67': middle_right, 'C68': middle_right, 'C69': middle_right,
+                # bottom_left
+                'C71': bottom_left, 'C72': bottom_left, 'C73': bottom_left,
+                'C81': bottom_left, 'C82': bottom_left, 'C83': bottom_left,
+                'C91': bottom_left, 'C92': bottom_left, 'C93': bottom_left,
+                # bottom_middle
+                'C74': bottom_middle, 'C75': bottom_middle, 'C76': bottom_middle,
+                'C84': bottom_middle, 'C85': bottom_middle, 'C86': bottom_middle,
+                'C94': bottom_middle, 'C95': bottom_middle, 'C96': bottom_middle,
+                # bottom_right
+                'C77': bottom_right, 'C78': bottom_right, 'C79': bottom_right,
+                'C87': bottom_right, 'C88': bottom_right, 'C89': bottom_right,
+                'C97': bottom_right, 'C98': bottom_right, 'C99': bottom_right
+            }
+            return resolution[cell_id]
         else:
             raise 'Unsupported Sudoku board size, only 4x4, 9x9, sorry not sorry'
 
     def nconflicts(self, var, val, assignment):
-        """Return the number of conflicts var=val has with other variables."""
+        """
+        Return the number of conflicts var=val has with other variables.
+        """
         count = 0
         for var2 in self.neighbors.get(var):
             val2 = None
             if assignment.__contains__(var2):
                 val2 = assignment[var2]
-            if val2 is not None and self.constraints(var, val, var2, val2) is False:
+            if val2 is not None and val != val2 is False:
                 count += 1
         return count
 
     def goal_test(self, state):
-        """The goal is to assign all variables, with all constraints satisfied."""
+        """
+        The goal is to assign all variables, with all constraints satisfied.
+        """
         assignment = dict(state)
         return (len(assignment) == len(self.variables)
                 and all(self.nconflicts(variables, assignment[variables], assignment) == 0
@@ -320,6 +409,20 @@ def minimum_remaining_values(csp, assignment):
     return vars_to_check[size.index(min(size))]
 
 
+def order_domain_values(var, assignment, csp):
+    """
+    The default value order.
+    """
+    return csp.choices(var)
+
+
+def mac(csp, var, value, assignment, removals):
+    """
+    Maintain arc consistency.
+    """
+    return ac3(csp, [(X, var) for X in csp.neighbors[var]], removals)
+
+
 def backtracking_search(csp):
     """
     Takes a CSP and finds a valid assignment for all the variables in the CSP,
@@ -334,12 +437,12 @@ def backtracking_search(csp):
     def backtrack(assignment):
         if len(assignment) == len(csp.variables):
             return assignment
-        var = select_unassigned_variable(assignment, csp)
+        var = minimum_remaining_values(csp, assignment)
         for value in order_domain_values(var, assignment, csp):
             if 0 == csp.nconflicts(var, value, assignment):
                 csp.assign(var, value, assignment)
                 removals = csp.suppose(var, value)
-                if inference(csp, var, value, assignment, removals):
+                if mac(csp, var, value, assignment, removals):
                     result = backtrack(assignment)
                     if result is not None:
                         return result
@@ -453,7 +556,7 @@ def display_builtin_puzzle(puzzle_num: int):
     :return:
     """
     return preview_base_temp.substitute(
-        preview = convert_board_to_html(
+        preview=convert_board_to_html(
             builtin_puzzles[puzzle_num]
         )
     )
@@ -466,7 +569,13 @@ def solve_builtin_puzzle(puzzle_num: int):
     :param puzzle_num:
     :return:
     """
-    return ""
+    a = backtracking_search(builtin_puzzles[puzzle_num])
+
+    return preview_base_temp.substitute(
+        preview=convert_board_to_html(
+            a
+        )
+    )
 
 
 @app.route('/display/<board>')
