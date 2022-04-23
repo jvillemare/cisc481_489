@@ -13,6 +13,8 @@ Table of Contents:
  - Each agent starts in the top left corner.
  - Position `[0, 0]` is the top-left corner.
  - Coins have values, 1 through 9.
+ - For some reason, the TA made x and y backwards on the coin and wall 
+   positions lists. It's stored as `[y, x]`.
 
 The data we have access to looks like:
 

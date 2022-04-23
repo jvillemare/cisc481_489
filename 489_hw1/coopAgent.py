@@ -1,5 +1,6 @@
 from env import *
-from typing import List
+from typing import List, Dict, Set, Tuple
+import numpy as np
 
 # Design your own agent(s) in this file.
 # You can use your own favorite icon or as simple as a colored square (with
@@ -16,43 +17,315 @@ def correct_positions(arr: List[int]) -> None:
     :return: None
     """
     for index in range(len(arr)):
-        arr[index] = [arr[index][0] / 50, arr[index][1] / 50]
+        arr[index] = [int(arr[index][0] / 50), int(arr[index][1] / 50)]
+
+
+HEATMAP_COLDEST = 0
+HEATMAP_AMBIENT = 300  # base temperature
+HEATMAP_HOTTEST = 5000
+
+
+def normalize_coin(raw: int) -> int:
+    """
+    Max-min normalize a coin value into temperature.
+    :param raw: Coin value.
+    :return: Scaled temperature value of coin.
+    """
+    return int(((raw - 1) / (9 - 1)) * HEATMAP_HOTTEST)
 
 
 def generate_heatmap(size: int,
                      coin_values: List[int],
                      coin_positions: List[List[int]],
-                     wall_positions: List[List[int]]) -> List[List[int]]:
+                     wall_positions: List[List[int]]) -> np.ndarray:
     """
-    Generate a heatmap of
-    :param size:
-    :param coin_positions:
-    :param wall_positions:
-    :return:
+    Generate a heatmap of board.
+    :param size: The length of the board, (size x size)
+    :param coin_values: The values of the coins
+    :param coin_positions: The positions of the coins. Assuming these values
+    have been normalized.
+    :param wall_positions: The position of the walls. Assuming these values
+    have been normalized.
+    :return: A heat map.
     """
-    pass
+    # make n x n matrix set to coldest temp
+    heatmap = np.full((size, size), HEATMAP_AMBIENT)
+    heatmap_avg = np.empty((size, size))
+    # apply the heat of the coin values
+    for x in range(len(coin_values)):
+        heatmap[coin_positions[x][1]][coin_positions[x][0]] = \
+            normalize_coin(coin_values[x])
+    # apply the cold of the walls
+    for w in wall_positions:
+        heatmap[w[1]][w[0]] = HEATMAP_COLDEST
+    # bleed the temps, average it out
+    r = 3  # radius
+    for x in range(size):
+        for y in range(size):
+            heatmap_avg[x][y] = \
+                round(
+                    np.mean(
+                        heatmap[
+                            max(x-r, 0):min(x+r, size),
+                            max(y-r, 0):min(y+r, size)
+                        ]
+                    ),
+                    2
+                )
+    print('=' * 80)
+    print('Heatmap:')
+    pretty_print_2d(heatmap_avg)
+    return heatmap_avg
 
 
-def find_nth_peak(heatmap: List[List[int]], n: int) -> List[int, int]:
+def pretty_print_2d(arr) -> None:
+    """Print a 2D array with tabs in between."""
+    print('\n'.join(['\t\t'.join([str(cell) for cell in row]) for row in arr]))
+
+
+def find_peak_index(a: np.ndarray, blacklist: List[List[int]]) -> Tuple:
     """
-    Find the n-th highest peak in a heatmap.
-    :param heatmap:
-    :param n:
-    :return:
+    Find the index of the largest value in a numpy ndarray not in a blacklist.
+    :param a: Numpy array to search in.
+    :param blacklist: Indexes to exclude when searching for peak.
+    :return: Index of non-blacklist peak.
     """
-    pass
+    peak, peak_index = -1000, None
+    for x in range(a.shape[0]):
+        for y in range(a.shape[1]):
+            if a[x][y] > peak and [x, y] not in blacklist:
+                peak = a[x][y]
+                peak_index = [x, y]
+    assert peak_index is not None, 'This should not be happening'
+    return peak_index
+    # return np.unravel_index(a.argmax(), a.shape)
 
 
-def djikstra():
-    pass
+class Dijkstra:
+    """
+    Dijkstra's algorithm.
+    Special thanks to https://stackoverflow.com/a/61078380/13158722
+    I have modified the code from the stackoverflow answer to slightly suit my
+    needs here.
+    """
+
+    def __init__(self, vertices, graph):
+        self.vertices = vertices  # ("A", "B", "C" ...)
+        self.graph = graph  # {"A": {"B": 1}, "B": {"A": 3, "C": 5} ...}
+
+    def find_route(self, start, end):
+        unvisited = {n: float("inf") for n in self.vertices}
+        unvisited[start] = 0  # set start vertex to 0
+        visited = {}  # list of all visited nodes
+        parents = {}  # predecessors
+        while unvisited:
+            # get the smallest distance
+            min_vertex = min(unvisited, key=unvisited.get)
+            for neighbour, _ in self.graph.get(min_vertex, {}).items():
+                if neighbour in visited:
+                    continue
+                new_distance = unvisited[min_vertex] + self.graph[min_vertex].get(neighbour, float("inf"))
+                # Prof. Keffer: check with BFS, because here we do not have
+                # uniform path cost values here.
+                if new_distance < unvisited[neighbour]:
+                    unvisited[neighbour] = new_distance
+                    parents[neighbour] = min_vertex
+            visited[min_vertex] = unvisited[min_vertex]
+            unvisited.pop(min_vertex)
+            if min_vertex == end:
+                break
+        return parents, visited
+
+    @staticmethod
+    def generate_path(parents, start, end):
+        path = [end]
+        while True:
+            key = parents[path[0]]
+            path.insert(0, key)
+            if key == start:
+                break
+        return path
 
 
-def convert_path_to_actions(path: List[List[int]]) -> List[str]:
-    pass
+def convert_str_to_pos(s: str) -> List[int]:
+    """Convert a string representation of a cell to a list of int coordinates"""
+    return list(map(int, s.replace('C', '').split(',')))
 
 
-def pathfind_to_pos(x: int, y: int) -> List[str]:
-    pass
+def convert_pos_to_str(pos: List[int]) -> str:
+    """Convert a list of int coordinates of a cell to a string representation"""
+    return 'C' + ','.join(list(map(str, pos)))
+
+
+def generate_graph(size: int,
+                   coin_values: List[int],
+                   coin_positions: List[List[int]],
+                   wall_positions: List[List[int]]) -> \
+        Tuple[Set[str], Dict[str, None]]:
+    """
+    Generates the list of edges used in Djikstra from a list of wall positions.
+    :param size: The length of the square board (size x size).
+    :param coin_values: The values of the coins.
+    :param coin_positions: The positions of the coins.
+    :param wall_positions: A list containing two element lists of normalized
+    wall positions. E.g. `[ [3, 2], ... ]
+    :return: A tuple containing the vertices and graph.
+    """
+    vertices = set()
+    graph = {}
+    # make vertices
+    for x in range(size + 1):
+        for y in range(size + 1):
+            # exclude all walls, they're not traversable
+            if [x, y] not in wall_positions:
+                vertices.add('C' + str(x) + ',' + str(y))
+    # make graph
+    def bad(pos):
+        """Check if a position is out of bounds or in a wall"""
+        return pos[0] < 0 or pos[0] > size or pos[1] < 0 or pos[1] > size or \
+               pos in wall_positions
+    def weighted_val(pos):
+        """Calculate the weighted value of a position"""
+        return 10 - coin_values[coin_positions.index(pos)] if pos in \
+                                                              coin_positions \
+            else 10
+    for v in vertices:
+        center = convert_str_to_pos(v)
+        neighbors = {}
+
+        # I had to do this explicitly instead of my nice for loop because:
+        # 1. the double nested for loop was causing a ton of problems
+        # 2. there's only 4 max neighbors a cell can have
+        # 3. this solution SHOULD be fool proof
+        # 4. the graph looks better (more reasonable) when I changed to this
+        left = [center[0] - 1, center[1]]
+        right = [center[0] + 1, center[1]]
+        up = [center[0], center[1] - 1]
+        down = [center[0], center[1] + 1]
+
+        if not bad(left):
+            neighbors[convert_pos_to_str(left)] = weighted_val(left)
+        if not bad(right):
+            neighbors[convert_pos_to_str(right)] = weighted_val(right)
+        if not bad(up):
+            neighbors[convert_pos_to_str(up)] = weighted_val(up)
+        if not bad(down):
+            neighbors[convert_pos_to_str(down)] = weighted_val(down)
+
+        # this pos was causing so many problems. I feel like as it is in its
+        # code block right now, it SHOULD work. but for some damn reason it
+        # keeps failing. no idea. keeping it here for prosperity.
+        """
+        for x in range(center[0] - 1, center[0] + 2):
+            for y in range(center[1] - 1, center[1] + 2):
+                # don't go out of the board
+                if x < 0 or x > size or y < 0 or y > size:
+                    continue
+                # don't include walls or itself
+                if [x, y] in wall_positions or [x, y] == v:
+                    continue
+                # don't include diagonals
+                
+                # Weight every node as 10...
+                value = 10
+                if [x, y] in coin_positions:
+                    # But make it better based on the value, so we can swing by
+                    # and grab coins on the way if they are good
+                    coin_idx = coin_positions.index([x, y])
+                    value -= coin_values[coin_idx]
+                neighbors[convert_pos_to_str([x, y])] = value
+        """
+        graph[v] = neighbors
+    return vertices, graph
+
+
+def path_find(start: List[int],
+              end: List[int],
+              size: int,
+              coin_values: List[int],
+              coin_positions: List[List[int]],
+              wall_positions: List[List[int]]) -> List[str]:
+    """
+    Find a path between a start and end position, for a board of a given size,
+    and given the positions of the walls.
+    :param start: Two element list, like `[x, y]`.
+    :param end: Two element list, like `[x, y]`.
+    :param size: The length of the board, like (size x size).
+    :param coin_values: The values of the coins.
+    :param coin_positions: The position of the coins.
+    :param wall_positions: List of two element lists containing the positions of
+    the walls, assuming they have been "normalized".
+    :return: The path to take to reach a specified location. Returns None if the
+    start and end match.
+    """
+    if start == end:
+        return None
+    vertices, graph = generate_graph(size, coin_values, coin_positions,
+                                     wall_positions)
+    # TODO: remove prints later
+    print('vertices', vertices)
+    print('graph', graph)
+    d = Dijkstra(vertices, graph)
+    start_vertex = convert_pos_to_str(start)
+    end_vertex = convert_pos_to_str(end)
+    p, v = d.find_route(
+        start_vertex,
+        end_vertex
+    )
+    se = d.generate_path(p, start_vertex, end_vertex)
+    return se
+
+
+def convert_path_to_actions(path: List[str]) -> List[str]:
+    """
+    Converts a path to a list of step actions that can be taken.
+    :param path: The path calculated by Djikstra's algorithm.
+    :return: The series of move actions ('u', 'r', 'd', 'l') in a list.
+    """
+    if path is None:
+        return None
+    actions = []
+    # the first element in the path is the current position
+    # skip it, and let's figure out the next step
+    last = convert_str_to_pos(path[0])
+    for p in path[1:]:
+        next_step = convert_str_to_pos(p)
+        if last[0] + 1 == next_step[0]:  # if x has increased, move right
+            actions.append('r')
+        elif last[1] + 1 == next_step[1]:  # if y has increased, move down
+            actions.append('d')
+        elif last[0] - 1 == next_step[0]:  # if x has decreased, move left
+            actions.append('l')
+        elif last[1] - 1 == next_step[1]:  # if y has decreased, move up
+            actions.append('u')
+        else:
+            raise Exception('This should not be possible, last is', last,
+                            'and next_step is', next_step)
+        last = convert_str_to_pos(p)
+    return actions
+
+
+def find_nearest_coin(current_pos: List[int],
+                      coin_values: List[int],
+                      coin_positions: List[List[int]]) -> List[int]:
+    """
+    Find the position of the nearest coin, weighted. This function is
+    weighted by coin values. This means that the coin distance is calculated,
+    and then reduced by its value.
+    :param current_pos: The current position of the agent.
+    :param coin_values: The values of the coins.
+    :param coin_positions: The position of the coins.
+    :return: The nearest coin.
+    """
+    distances = []
+    pos = np.array(current_pos)
+    for idx in range(len(coin_values)):
+        distances.append(
+            np.linalg.norm(
+                pos - np.array(coin_positions[idx])
+            ) * (2.0 / coin_values[idx])  # 2.0 is an arbitrary number
+        )
+    return coin_positions[np.unravel_index(pos.argmin(), pos.shape)[0]]
 
 
 class PlayerA(pygame.sprite.Sprite):
@@ -72,6 +345,7 @@ class PlayerA(pygame.sprite.Sprite):
         self.rect.y = 0
         self.true_x = 0  # I added this to better keep track of my real position
         self.true_y = 0  # I added this to better keep track of my real position
+        self.actions = []   # I added this to carry a path plan to future states
         self.speedx = SPEED
         self.speedy = SPEED
         self.score = 0
@@ -130,10 +404,62 @@ class PlayerA(pygame.sprite.Sprite):
         if direction == 3:
             self.move('d')  # move down
         """
+        # get all the data
         coin_values, coin_positions = get_coin_data()
         wall_positions = get_wall_data()
         correct_positions(coin_positions)
         correct_positions(wall_positions)
+        print('coin_positions', coin_positions)
+        print('wall_positions', wall_positions)
+
+        print('Agent is currently at pos', self.rect.x, self.rect.y)
+        print('Agent is currently at true pos', self.true_x, self.true_y)
+
+        # find the hottest area in the map, and calculate a path to it
+        if len(self.actions) == 0:
+            print('Agent 1 finding new hot area...')
+            hm = generate_heatmap(N, coin_values, coin_positions, wall_positions)
+            peak_x, peak_y = find_peak_index(hm, wall_positions)
+            print('Agent 1 moving to hot area', [peak_x, peak_y])
+            print('Agent 1 determining path from', [self.true_x,
+                                                    self.true_y], 'to',
+                  [peak_x, peak_y])
+            path = path_find(
+                [self.true_x, self.true_y],
+                [peak_x, peak_y],
+                N,
+                coin_values,
+                coin_positions,
+                wall_positions
+            )
+            self.actions = convert_path_to_actions(path)
+
+        # if already in the hottest area, look for the nearest coin
+        if self.actions is None:
+            print('Agent 1 searching for nearest coin...')
+            nearest_coin = find_nearest_coin(
+                [self.true_x, self.true_y],
+                coin_values,
+                coin_positions
+            )
+            path = path_find(
+                [self.true_x, self.true_y],
+                nearest_coin,
+                N,
+                coin_values,
+                coin_positions,
+                wall_positions
+            )
+            print('Agent 1 going to nearest coin:', nearest_coin)
+            self.actions = convert_path_to_actions(path)
+
+        print('Agent 1 following a plan of length', str(len(self.actions)))
+        next_action = self.actions.pop(0)
+        self.move(next_action)
+
+        #print('=' * 80)
+        #h = generate_heatmap(N, coin_values, coin_positions, wall_positions)
+        #pretty_print_2d(h)
 
         # Avoid colliding with wall and go out of edges
         if self.rect.right > WIDTH:
