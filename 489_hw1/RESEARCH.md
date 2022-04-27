@@ -99,3 +99,40 @@ baseline is.
    hottest, and Agent 2 goes for the center of the second hottest area. 
    Their path to their designated hot areas can be augmented by "left" or 
    "right" by one if their is a coin of value 2 or greater.
+
+## Tuning
+
+Okay, now that I got Agent 1 working as intended, I'm going to run it 
+multiple times to improve it.
+
+ - **Baseline:** Total score is `51`
+ - Change 1
+   - **Cause:** Increase the default weight of a node in the Dijkstra graph 
+     from 10 to 40, and make the coin values on decrease the node weight 
+     more significantly (multiple of 4)
+   - **Effect:** Same total score of `51`
+ - Change 2
+   - **Cause:** I gave Agent 2 logic. It will now just search for the 
+     nearest coin and go to it.
+   - **Effect:** Total score is now `-829`
+ - Change 3
+   - **Cause:** I added an `exclude_pos` (exclude position) argument to my 
+     `path_find` 
+     function. The path planning will now exclude the provided position (the 
+     position of the other player) when generating the graph.
+   - **Effect:** Total score is now `-14`
+ - Change 4
+   - **Cause:** I don't really know, I just added a few print statements.
+   - **Effect:** Total score is now `186`, sometimes `181`, and sometimes 
+     crashes. I'm so stumped. It should be consistent. I don't know why it 
+     is random.
+ - Change 5
+   - **Cause:** Player A excludes Player B's position from its path finding, 
+     as well
+   - **Effect:** Did not crash, score still `186`.
+ - Change 6
+   - **Cause:** In my `generate_graph` function, I upgraded the exclude 
+     position argument, so it now excludes the provided position (the other 
+     player's position) and excludes every adjacent cell (right, left, up, 
+     down) from path finding.
+   - **Effect:** No collisions, and a new top score of `198`.

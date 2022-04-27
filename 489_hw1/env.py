@@ -7,7 +7,7 @@ SEED = 0
 # Total game time in seconds. You may change it to a larger value to
 # make the game runs longer
 # DEFAULT: 12
-SEC = 30
+SEC = 12
 
 # Tileworld size
 # DEFAULT: 11
