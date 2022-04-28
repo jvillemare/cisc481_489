@@ -138,6 +138,7 @@ class Dijkstra:
 
     @staticmethod
     def generate_path(parents, start, end):
+        print('Generating path with start =', start, 'and end =', end)
         path = [end]
         while True:
             key = parents[path[0]]
@@ -206,9 +207,9 @@ def generate_graph(agent: int,
 
     def weighted_val(pos):
         """Calculate the weighted value of a position"""
-        return 40 - (coin_values[coin_positions.index(pos)] * 4) if pos in \
+        return 100 - (coin_values[coin_positions.index(pos)] * 10) if pos in \
                                                               coin_positions \
-            else 40
+            else 100
 
     for v in vertices:
         center = convert_str_to_pos(v)
@@ -356,6 +357,176 @@ def find_nearest_coin(current_pos: List[int],
     return coin_positions[np.unravel_index(pos.argmin(), pos.shape)[0]]
 
 
+def construct_initial_plan(agent: int,
+                           size: int,
+                           wall_positions: List[List[int]],
+                           direction: str,
+                           paces: int) -> List[str]:
+    """
+    Construct an initial plan for agents to space out with.
+    :param agent: The number of the agent (A = 1, B = 2).
+    :param size: Size of the board.
+    :param wall_positions: The positions of the walls to avoid.
+    :param direction: The direction that they will head for a number of paces.
+    :param paces: The number of paces to move.
+    :return: The actions needed to space out.
+    """
+    plan = None
+
+    dest = None
+    if direction == 'r':
+        dest = [paces, 0]
+    elif direction == 'd':
+        dest = [0, paces]
+    else:
+        raise Exception('Invalid direction', direction, 'was passed')
+
+    path = path_find(
+        agent,
+        [0, 0],
+        dest,
+        size,
+        [],
+        [[]],
+        wall_positions,
+        [-2, -2]
+    )
+    plan = convert_path_to_actions(path)
+
+    print('Initial plan for Agent', agent, 'is', plan)
+    return plan
+
+
+def reconsider_surroundings(agent: int,
+                            position: List[int],
+                            coin_values: List[int],
+                            coin_positions: List[List[int]],
+                            wall_positions: List[List[int]],
+                            other_agent_pos: List[int]):
+    """
+    Reconsider current plan if there is a coin immediately adjacent OR
+    diagonal to the agents current position.
+    :param agent:
+    :param position:
+    :param coin_values:
+    :param coin_positions:
+    :param wall_positions:
+    :param other_agent_pos:
+    :return: A new list of actions to take to the nearest coin. Otherwise
+    returns None if there are no adjacent coins
+    """
+    pass
+
+
+def random_action(agent: int,
+                  position: List[int],
+                  size: int,
+                  wall_positions: List[List[int]],
+                  other_agent_pos: List[int]) -> str:
+    """
+    Come up with a random filler action.
+    :param agent: The number of the current agent.
+    :param position: The position of the current agent.
+    :param size: The size of the board.
+    :param wall_positions: The positions of the walls on the board.
+    :param other_agent_pos: The position of the other agent.
+    :return: A random move. None if there are no good moves.
+    """
+    print('Agent', agent, 'had to resort to a random action, this is not good')
+    left =  [position[0] - 1, position[1]]
+    right = [position[0] + 1, position[1]]
+    up =    [position[0],     position[1] - 1]
+    down =  [position[0],     position[1] + 1]
+
+    def bad(pos):
+        """Determine if a given position is bad in this context"""
+        return pos[0] < 0 or pos[0] > size or pos[1] < 0 or pos[1] > size in \
+               wall_positions or pos == other_agent_pos
+
+    if not bad(left):
+        return 'l'
+    if not bad(right):
+        return 'r'
+    if not bad(up):
+        return 'u'
+    if not bad(down):
+        return 'd'
+    else:
+        return None
+
+
+def action_spelled_out(action: str) -> None:
+    """
+    Converts a one letter action to fully spelled out ('r' becomes 'right')
+    :param action: The one letter action.
+    :return: It fully spelled out.
+    """
+    translate = {
+        'r': 'right',
+        'l': 'left',
+        'd': 'down',
+        'u': 'up'
+    }
+    return translate[action]
+
+
+def other_agent_adjacent(agent: int,
+                         pos: List[int],
+                         other_pos: List[int],
+                         wall_positions: List[List[int]]) -> str:
+    """
+    If there is another agent adjacent OR DIAGONAL, then come up with a move
+    that moves in the opposite direction of the agent.
+
+    This was necessary because I was having too many accidental collisions
+    with agents, even with all of my other safety code that I thought would
+    handle this.
+
+    :param agent: The ID of the agent calling this function.
+    :param pos: The position of the calling agent.
+    :param other_pos: The position of the other agent.
+    :param wall_positions: The position of the walls.
+    :return: None if there is no agent nearby, or a move in a single string
+    ('l', 'r', 'u', or 'd') if there is an agent nearby.
+    """
+    # this means that the two agents are one or two moves away from each other
+    if np.linalg.norm( np.array(pos) - np.array(other_pos) ) < 2.0:
+        a_m = None
+
+        left =  [pos[0] - 1, pos[1]]
+        right = [pos[0] + 1, pos[1]]
+        up =    [pos[0],     pos[1] - 1]
+        down =  [pos[0],     pos[1] + 1]
+
+        # verified by white board drawings
+        top_left =     [pos[0] - 1, pos[1] - 1]
+        top_right =    [pos[0] + 1, pos[1] - 1]
+        bottom_left =  [pos[0] - 1, pos[1] + 1]
+        bottom_right = [pos[0] + 1, pos[1] + 1]
+
+        # this is super verbose, and it's because i'm tired of making elegant
+        # solutions that fail, and then i just have to resort to hard coding it
+        if left == other_pos:
+            a_m = 'r'  # go opposite of where other agent is
+        if right == other_pos:
+            a_m = 'l'
+        if up == other_pos:
+            a_m = 'd'
+        if down == other_pos:
+            a_m = 'u'
+
+        # these next returns are going to be somewhat arbitrary, may change
+        # later
+        if top_left == other_pos:
+            a_m = 'e'
+
+        print('Agent', agent, 'is too close to another agent, avoid move is',
+              action_spelled_out(a_m))
+        return a_m
+    else:
+        return None
+
+
 broadcast_player_a_pos = [0, 0]
 broadcast_player_b_pos = [0, 0]
 
@@ -377,10 +548,16 @@ class PlayerA(pygame.sprite.Sprite):
         self.rect.y = 0
         self.true_x = 0  # I added this to better keep track of my real position
         self.true_y = 0  # I added this to better keep track of my real position
-        self.actions = ['r', 'r', 'r', 'r', 'r']   # I added this to carry a
-        # path
-        # plan to
-        # future states
+        wall_positions = get_wall_data()
+        correct_positions(wall_positions)
+        self.actions = construct_initial_plan(
+            1,
+            N,
+            wall_positions,
+            'r',
+            5
+        )
+        self.look_around_count = 0
         self.speedx = SPEED
         self.speedy = SPEED
         self.score = 0
@@ -453,7 +630,7 @@ class PlayerA(pygame.sprite.Sprite):
         print('Agent 1 is currently at true pos', self.true_x, self.true_y)
 
         # find the hottest area in the map, and calculate a path to it
-        if len(self.actions) == 0:
+        if len(self.actions) == 0: # and self.look_around_count == 0:
             print('Agent 1 finding new hot area...')
             hm = generate_heatmap(N, coin_values, coin_positions, wall_positions)
             peak_x, peak_y = find_peak_index(hm, wall_positions)
@@ -472,6 +649,7 @@ class PlayerA(pygame.sprite.Sprite):
                 broadcast_player_b_pos
             )
             self.actions = convert_path_to_actions(path)
+            # self.look_around_count = 2
 
         # if already in the hottest area, look for the nearest coin
         if self.actions is None:
@@ -493,6 +671,7 @@ class PlayerA(pygame.sprite.Sprite):
             )
             print('Agent 1 going to nearest coin:', nearest_coin)
             self.actions = convert_path_to_actions(path)
+            # self.look_around_count -= 1
 
         print('Agent 1 following a plan of length', str(len(self.actions)))
         next_action = self.actions.pop(0)
@@ -527,7 +706,15 @@ class PlayerB(pygame.sprite.Sprite):
         self.rect.y = 0
         self.true_x = 0  # I added this to better keep track of my real position
         self.true_y = 0  # I added this to better keep track of my real position
-        self.actions = ['d', 'd', 'd', 'd', 'd']
+        wall_positions = get_wall_data()
+        correct_positions(wall_positions)
+        self.actions = construct_initial_plan(
+            1,
+            N,
+            wall_positions,
+            'd',
+            5
+        )
         self.speedx = SPEED
         self.speedy = SPEED
         self.score = 0

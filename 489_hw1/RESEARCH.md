@@ -135,4 +135,15 @@ multiple times to improve it.
      position argument, so it now excludes the provided position (the other 
      player's position) and excludes every adjacent cell (right, left, up, 
      down) from path finding.
-   - **Effect:** No collisions, and a new top score of `198`.
+   - **Effect:** No collisions, and a new top score of `198`, sometimes `199`.
+ - Change 7
+   - **Cause:** Bump up weights of graph generation, where every node is 
+     weighted as 100 by default, and if there is a coin on that node, then 
+     the weight of that node is subtracted by the coin value times 10. This 
+     gives an even greater weight to nodes with coins on it.
+   - **Effect:** New high score of `207`.
+ - Change 8
+   - **Cause:** I tried giving Agent 1 a `look_around` counter so that it 
+     would stay in a hot area and gather coins.
+   - **Effect:** Agent 1 got stuck in a position, and then eventually 
+     crashed, somehow. I removed this look around counter.
