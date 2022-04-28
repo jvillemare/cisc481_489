@@ -1,6 +1,7 @@
 from env import *
 from typing import List, Dict, Set, Tuple
 import numpy as np
+import random
 
 # Design your own agent(s) in this file.
 # You can use your own favorite icon or as simple as a colored square (with
@@ -83,7 +84,7 @@ def pretty_print_2d(arr) -> None:
     print('\n'.join(['\t\t'.join([str(cell) for cell in row]) for row in arr]))
 
 
-def find_peak_index(a: np.ndarray, blacklist: List[List[int]]) -> Tuple:
+def find_peak_index(a: np.ndarray, blacklist: List[List[int]]) -> List[int]:
     """
     Find the index of the largest value in a numpy ndarray not in a blacklist.
     :param a: Numpy array to search in.
@@ -138,13 +139,24 @@ class Dijkstra:
 
     @staticmethod
     def generate_path(parents, start, end):
+        """
+        Calclualte path by parents from start to end.
+        :param parents: As calculated by find_route method in this class.
+        :param start: Begin vertex.
+        :param end: End vertex.
+        :return: The path of vertices, or None if no path is possible.
+        """
         print('Generating path with start =', start, 'and end =', end)
         path = [end]
-        while True:
-            key = parents[path[0]]
-            path.insert(0, key)
-            if key == start:
-                break
+        try:
+            while True:
+                key = parents[path[0]]
+                path.insert(0, key)
+                if key == start:
+                    break
+        except KeyError:
+            print('No path is possible')
+            return None
         return path
 
 
@@ -470,11 +482,13 @@ def action_spelled_out(action: str) -> None:
     return translate[action]
 
 
-def other_agent_adjacent(agent: int,
+def other_agent_adjacent_old(agent: int,
                          pos: List[int],
                          other_pos: List[int],
                          wall_positions: List[List[int]]) -> str:
     """
+    DEPRECATED. DEPRECATED. DEPRECATED. DEPRECATED. DEPRECATED. DEPRECATED.
+
     If there is another agent adjacent OR DIAGONAL, then come up with a move
     that moves in the opposite direction of the agent.
 
@@ -488,6 +502,8 @@ def other_agent_adjacent(agent: int,
     :param wall_positions: The position of the walls.
     :return: None if there is no agent nearby, or a move in a single string
     ('l', 'r', 'u', or 'd') if there is an agent nearby.
+
+    DEPRECATED. DEPRECATED. DEPRECATED. DEPRECATED. DEPRECATED. DEPRECATED.
     """
     # this means that the two agents are one or two moves away from each other
     if np.linalg.norm( np.array(pos) - np.array(other_pos) ) < 2.0:
@@ -520,11 +536,75 @@ def other_agent_adjacent(agent: int,
         if top_left == other_pos:
             a_m = 'e'
 
+        # NOTE: yeah no i'm abandoning this
+        # ======================================================================
+
         print('Agent', agent, 'is too close to another agent, avoid move is',
               action_spelled_out(a_m))
         return a_m
     else:
         return None
+
+
+def other_agent_adjacent(agent: int,
+                         pos1: List[int],
+                         pos2: List[int]) -> bool:
+    """
+    Determines if a agent is adjacent to another agent.
+    :param agent: The ID of the agent.
+    :param pos1: Position of the first agent.
+    :param pos2: Position af the second agent
+    :return: True if pos1 is adjacent to pos2, False if not.
+    """
+    if np.linalg.norm( np.array(pos1) - np.array(pos2) ) < 2.0:
+        print('Agent', agent, 'is adjacent to another agent, pos1 =', pos1,
+              'pos2 =', pos2)
+        return True
+    else:
+        return False
+
+
+def opposite_corner(size: int,
+                    pos: List[int]) -> List[int]:
+    """
+    When provided a position, this functions finds the closest corner, then
+    returns the corner opposite of it.
+
+    This is used when two agents are close together, just start heading away
+    from each other.
+    :param size: The size of the board.
+    :param pos: The position of the other agent.
+    :return: The opposite corner.
+    """
+    # setup numpy arrays
+    top_left =     np.array([0, 0])
+    top_right =    np.array([size, 0])
+    bottom_left =  np.array([0, size])
+    bottom_right = np.array([size, size])
+    np_pos = np.array(pos)
+
+    # calculate distances
+    tl_d = np.linalg.norm( np.array(top_left) - np.array(np_pos) )
+    tr_d = np.linalg.norm(np.array(top_right) - np.array(np_pos))
+    bl_d = np.linalg.norm(np.array(bottom_left) - np.array(np_pos))
+    br_d = np.linalg.norm(np.array(bottom_right) - np.array(np_pos))
+
+    # top_left has the closest distance, return the opposite corner
+    if tl_d < tr_d < bl_d < br_d:
+        return list(bottom_right)
+    elif tr_d < tl_d < bl_d < br_d:  # top_right closest
+        return list(bottom_left)
+    elif bl_d < tl_d < tr_d < br_d:  # bottom_left closest
+        return list(top_right)
+    elif br_d < tl_d < tr_d < bl_d:  # bottom_right closest
+        return list(top_left)
+    else:  # all equally close?
+        return list(random.choice([
+            top_left,
+            top_right,
+            bottom_left,
+            bottom_right
+        ]))
 
 
 broadcast_player_a_pos = [0, 0]
@@ -548,6 +628,8 @@ class PlayerA(pygame.sprite.Sprite):
         self.rect.y = 0
         self.true_x = 0  # I added this to better keep track of my real position
         self.true_y = 0  # I added this to better keep track of my real position
+        self.mode = 'START_MODE'  # 'START_MODE', 'HOT_AREA', or 'FOCUS_COIN'
+        self.focus_coin = None
         wall_positions = get_wall_data()
         correct_positions(wall_positions)
         self.actions = construct_initial_plan(
@@ -555,7 +637,7 @@ class PlayerA(pygame.sprite.Sprite):
             N,
             wall_positions,
             'r',
-            5
+            7
         )
         self.look_around_count = 0
         self.speedx = SPEED
@@ -629,18 +711,20 @@ class PlayerA(pygame.sprite.Sprite):
         print('Agent 1 is currently at pos', self.rect.x, self.rect.y)
         print('Agent 1 is currently at true pos', self.true_x, self.true_y)
 
+        current_pos = [self.true_x, self.true_y]
+
+        """
         # find the hottest area in the map, and calculate a path to it
         if len(self.actions) == 0: # and self.look_around_count == 0:
             print('Agent 1 finding new hot area...')
             hm = generate_heatmap(N, coin_values, coin_positions, wall_positions)
             peak_x, peak_y = find_peak_index(hm, wall_positions)
             print('Agent 1 moving to hot area', [peak_x, peak_y])
-            print('Agent 1 determining path from', [self.true_x,
-                                                    self.true_y], 'to',
+            print('Agent 1 determining path from', current_pos, 'to',
                   [peak_x, peak_y])
             path = path_find(
                 1,
-                [self.true_x, self.true_y],
+                current_pos,
                 [peak_x, peak_y],
                 N,
                 coin_values,
@@ -648,20 +732,29 @@ class PlayerA(pygame.sprite.Sprite):
                 wall_positions,
                 broadcast_player_b_pos
             )
-            self.actions = convert_path_to_actions(path)
+            if path == None:
+                self.actions = [random_action(
+                    1,
+                    current_pos,
+                    N,
+                    wall_positions,
+                    broadcast_player_b_pos
+                )]
+            else:
+                self.actions = convert_path_to_actions(path)
             # self.look_around_count = 2
 
         # if already in the hottest area, look for the nearest coin
         if self.actions is None:
             print('Agent 1 searching for nearest coin...')
             nearest_coin = find_nearest_coin(
-                [self.true_x, self.true_y],
+                current_pos,
                 coin_values,
                 coin_positions
             )
             path = path_find(
                 1,
-                [self.true_x, self.true_y],
+                current_pos,
                 nearest_coin,
                 N,
                 coin_values,
@@ -675,11 +768,176 @@ class PlayerA(pygame.sprite.Sprite):
 
         print('Agent 1 following a plan of length', str(len(self.actions)))
         next_action = self.actions.pop(0)
+
+        # double check for collision
+        if other_agent_adjacent(1, broadcast_player_a_pos,
+                                broadcast_player_b_pos):
+            print('Agent 1 about to collide, adopting plan to run away')
+            oc = opposite_corner(N, broadcast_player_b_pos)
+            path = path_find(
+                1,
+                current_pos,
+                oc,
+                N,
+                coin_values,
+                coin_positions,
+                wall_positions,
+                [-2, -2]
+            )
+            self.actions = convert_path_to_actions(path)
+            next_action = self.actions.pop(0)
+
+        """
+
+        """
+        if self.mode == 'START_MODE':
+            next_action = self.actions.pop(0)
+            self.move(next_action)
+            if len(self.actions) == 0:
+                self.mode = 'HOT_AREA'
+        elif self.mode == 'HOT_AREA':
+            # reconsider path to hot area
+            print('Agent 1 finding new hot area...')
+            hm = generate_heatmap(N, coin_values, coin_positions, wall_positions)
+            peak_x, peak_y = find_peak_index(hm, wall_positions)
+            print('Agent 1 moving to hot area', [peak_x, peak_y])
+            print('Agent 1 determining path from', current_pos, 'to', [peak_x,
+                                                                           peak_y])
+            path = path_find(
+                1,
+                current_pos,
+                [peak_x, peak_y],
+                N,
+                coin_values,
+                coin_positions,
+                wall_positions,
+                broadcast_player_b_pos
+            )
+            if path is None:
+                self.mode == 'FOCUS_COIN'
+            else:
+                self.actions = convert_path_to_actions(path)
+                next_action = self.actions.pop(0)
+                self.move(next_action)
+        if self.mode == 'FOCUS_COIN':
+            if self.focus_coin is None:
+                nearest_coin = find_nearest_coin(
+                    current_pos,
+                    coin_values,
+                    coin_positions
+                )
+                print('Agent 1 pos', broadcast_player_a_pos)
+                print('Agent 2 pos', broadcast_player_b_pos)
+                path = path_find(
+                    2,
+                    current_pos,
+                    nearest_coin,
+                    N,
+                    coin_values,
+                    coin_positions,
+                    wall_positions,
+                    broadcast_player_a_pos
+                )
+                if path is None:
+                    whitelisted_coins_pos = coin_positions.copy()
+                    whitelisted_coins_vals = coin_values.copy()
+                    # since the nearest coin is unreachable, remove it from the list
+                    remove_index = coin_positions.index(nearest_coin)
+                    whitelisted_coins_pos.pop(remove_index)
+                    whitelisted_coins_vals.pop(remove_index)
+                    next_nearest_coin = None
+                    while next_nearest_coin is None:
+                        next_nearest_coin = find_nearest_coin(
+                            current_pos,
+                            [1] * len(whitelisted_coins_pos),
+                            whitelisted_coins_pos
+                        )
+                        path = path_find(
+                            2,
+                            current_pos,
+                            next_nearest_coin,
+                            N,
+                            coin_values,
+                            whitelisted_coins_pos,
+                            wall_positions,
+                            broadcast_player_a_pos
+                        )
+                        if path is None:
+                            remove_index = coin_positions.index(next_nearest_coin)
+                            whitelisted_coins_pos.pop(remove_index)
+                            whitelisted_coins_vals.pop(remove_index)
+                            next_nearest_coin = None
+                    nearest_coin = next_nearest_coin
+
+                self.focus_coin = nearest_coin
+                print('Agent 1 going to nearest coin:', nearest_coin)
+                self.actions = convert_path_to_actions(path)
+            if self.focus_coin is not None:
+                print('Agent 1 following a plan of length',
+                      str(len(self.actions)))
+                next_action = self.actions.pop(0)
+                self.move(next_action)
+        """
+
+        # just keep looking for the nearest coin, and go for it
+        if len(self.actions) == 0:
+            nearest_coin = find_nearest_coin(
+                [self.true_x, self.true_y],
+                coin_values,
+                coin_positions
+            )
+            print('Agent 1 pos', broadcast_player_a_pos)
+            print('Agent 2 pos', broadcast_player_b_pos)
+            path = path_find(
+                2,
+                [self.true_x, self.true_y],
+                nearest_coin,
+                N,
+                coin_values,
+                coin_positions,
+                wall_positions,
+                broadcast_player_b_pos
+            )
+            if path is None:
+                whitelisted_coins_pos = coin_positions.copy()
+                whitelisted_coins_vals = coin_values.copy()
+                # since the nearest coin is unreachable, remove it from the list
+                remove_index = coin_positions.index(nearest_coin)
+                whitelisted_coins_pos.pop(remove_index)
+                whitelisted_coins_vals.pop(remove_index)
+                next_nearest_coin = None
+                while next_nearest_coin is None:
+                    next_nearest_coin = find_nearest_coin(
+                        [self.true_x, self.true_y],
+                        [1] * len(whitelisted_coins_pos),
+                        whitelisted_coins_pos
+                    )
+                    path = path_find(
+                        2,
+                        [self.true_x, self.true_y],
+                        next_nearest_coin,
+                        N,
+                        coin_values,
+                        whitelisted_coins_pos,
+                        wall_positions,
+                        broadcast_player_b_pos
+                    )
+                    if path is None:
+                        remove_index = whitelisted_coins_pos.index(next_nearest_coin)
+                        whitelisted_coins_pos.pop(remove_index)
+                        whitelisted_coins_vals.pop(remove_index)
+                        next_nearest_coin = None
+
+            print('Agent 1 going to nearest coin:', nearest_coin)
+            self.actions = convert_path_to_actions(path)
+
+        print('Agent 1 following a plan of length', str(len(self.actions)))
+        next_action = self.actions.pop(0)
         self.move(next_action)
 
-        #print('=' * 80)
-        #h = generate_heatmap(N, coin_values, coin_positions, wall_positions)
-        #pretty_print_2d(h)
+        # print('=' * 80)
+        # h = generate_heatmap(N, coin_values, coin_positions, wall_positions)
+        # pretty_print_2d(h)
 
         # Avoid colliding with wall and go out of edges
         if self.rect.right > WIDTH:
@@ -760,6 +1018,7 @@ class PlayerB(pygame.sprite.Sprite):
         correct_positions(coin_positions)
         correct_positions(wall_positions)
 
+        # just keep looking for the nearest coin, and go for it
         if len(self.actions) == 0:
             nearest_coin = find_nearest_coin(
                 [self.true_x, self.true_y],
@@ -778,6 +1037,36 @@ class PlayerB(pygame.sprite.Sprite):
                 wall_positions,
                 broadcast_player_a_pos
             )
+            if path is None:
+                whitelisted_coins_pos = coin_positions.copy()
+                whitelisted_coins_vals = coin_values.copy()
+                # since the nearest coin is unreachable, remove it from the list
+                remove_index = coin_positions.index(nearest_coin)
+                whitelisted_coins_pos.pop(remove_index)
+                whitelisted_coins_vals.pop(remove_index)
+                next_nearest_coin = None
+                while next_nearest_coin is None:
+                    next_nearest_coin = find_nearest_coin(
+                        [self.true_x, self.true_y],
+                        [1] * len(whitelisted_coins_pos),
+                        whitelisted_coins_pos
+                    )
+                    path = path_find(
+                        2,
+                        [self.true_x, self.true_y],
+                        next_nearest_coin,
+                        N,
+                        coin_values,
+                        whitelisted_coins_pos,
+                        wall_positions,
+                        broadcast_player_a_pos
+                    )
+                    if path is None:
+                        remove_index = whitelisted_coins_pos.index(next_nearest_coin)
+                        whitelisted_coins_pos.pop(remove_index)
+                        whitelisted_coins_vals.pop(remove_index)
+                        next_nearest_coin = None
+
             print('Agent 2 going to nearest coin:', nearest_coin)
             self.actions = convert_path_to_actions(path)
 

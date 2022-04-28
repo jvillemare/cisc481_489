@@ -1,4 +1,6 @@
-# Tileworld Research
+# Tileworld Project
+
+By James Villemarette for CISC 489: Programming Assignment 1.
 
 Table of Contents:
 
@@ -6,6 +8,8 @@ Table of Contents:
  - [Questions](#questions)
  - [Runs](#runs)
  - [Theories](#theories)
+ - [Tuning](#tuning)
+ - [Conclusion](#conclusion)
 
 ## Initial Findings
 
@@ -147,3 +151,58 @@ multiple times to improve it.
      would stay in a hot area and gather coins.
    - **Effect:** Agent 1 got stuck in a position, and then eventually 
      crashed, somehow. I removed this look around counter.
+ - Analysis 1
+   - I'm finding this problem would have been way easier if I had
+     1. Organized all the environmental variables into some holder/data class.
+     2. Followed the `Beliefs(...); Reconsider(...); Plan(...); Execute(...)
+        ` main control paradigm described in the book.
+     3. More thoroughly planned my agents.
+ - Analysis 2
+   - I'm also finding that my Agent 1 probably is not getting a lot of 
+     obvious/easy coin grabs because high value coins pop up on its way to 
+     an objective.
+ - Change 9
+   - **Cause:** Massive re-write of Agent 1's logic, now representing its 
+     beliefs and desires through `"modes"`, where it is either starting up 
+     (`START_MODE`), moving to a hot area (`HOT_AREA`), or hunting for a coin 
+     in that hot area (`FOCUS_COIN`).
+   - **Effect:** 
+
+## Conclusion
+
+Functions/classes I wrote:
+
+ - `correct_positions`: To fix the pixel value positions of the coins and walls
+ - `normalize_coin`: For generating a heat map, calculate the temp of a coin 
+   based on its value (higher value coins are hotter).
+ - `generate_heatmap`: Makes the heatmap based on coins (hot) and walls (cold).
+ - `pretty_print_2d`: For printing the heatmap
+ - `find_peak_index`: For finding the highest value in the heatmap.
+ - `Dijkstra`: Class for path finding.
+ - `convert_str_to_pos`: For converting a cell's string representaiton (`C1,
+   1`) to a list representation (`[1, 1]`)
+ - `convert_pos_to_str`: Opposite of above function
+ - `generate_graph`: Makes the graph that the `Dijkstra` class will search in
+ - `path_find`: Wrapper function that uses `generate_graph` and `Dijkstra` 
+   to find the path between two vertices
+ - `convert_path_to_actions`: Converts the path found by `Dijstra` to a list 
+   of actions
+ - `find_nearest_coin`: Finds the nearest coin by 2D distance
+ - `construct_initial_plan`: To space out the two agents at the beginning, 
+   have this calculate the path 
+ - `reconsider_surroundings`: A function that would reconsider the current 
+   plan, but I thought it would best just to manually implement it in the 
+   Agent `update()` function
+ - `random_action`: Comes up with a random action that's safe. I used it for 
+   testing. Never worked well
+ - `action_spelled_out`: Converted a single letter action to its full word 
+   (`r = right`)
+ - `other_agent_adjacent_old`: A function that became too complicated than 
+   was necessary. Deprecated
+ - `other_agent_adjacent`: Determines if another agent is adjacent or 
+   diagonal by one tile away
+ - `opposite_corner`: Calculate the closest corner to a given position, then 
+   give the corner opposite that corner. Used for if the agents get too 
+   close, run away
+
+
