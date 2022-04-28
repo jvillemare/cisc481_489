@@ -166,7 +166,12 @@ multiple times to improve it.
      beliefs and desires through `"modes"`, where it is either starting up 
      (`START_MODE`), moving to a hot area (`HOT_AREA`), or hunting for a coin 
      in that hot area (`FOCUS_COIN`).
-   - **Effect:** 
+   - **Effect:** Errors, errors, and more errors.
+ - Change 10
+   - **Cause:** Just make Agent 1 the same as Agent 2, except Agent 1 will 
+     look at the weighted value of coins, where Agent 2 will just pursue the 
+     nearest coin regardless of value.
+   - **Effect:** New high score of `220`.
 
 ## Conclusion
 
@@ -205,4 +210,28 @@ Functions/classes I wrote:
    give the corner opposite that corner. Used for if the agents get too 
    close, run away
 
+In conclusion, all of my heatmap stuff did actually work in some way. It was 
+just hard to maintain and understand as time went on. I mentioned in my 
+analysis above that I should've represented the problem as an object holding 
+all of the environmental data. It would have made handling the function 
+parameters a little easier.
 
+My final high score was `220` for with all the default settings. I do not 
+have 
+enough time here at night to get testing different run configurations. I do 
+know that running it multiple times, that it does not crash. So, that's 
+pretty cool.
+
+I wish I had even more time to figure out the heatmap stuff and more 
+advanced algorithms. But I do have to put this down and focus on other 
+homeworks.
+
+**High Level Summary:** Agent 1 goes to the right by a few paces, and then 
+starts looking for the closest coin, weighted by value. Agent 2 goes down by 
+a few paces, and then starts looking for the closest coin, regardless of 
+value. The agents "communicate" by telling each other their positions, and 
+then avoiding a large area around each other in the path planning functions. 
+This is the best design I could come up with multiple iterations of the 
+agent code. You can see the agent code commented out, as well as some unused 
+functions. All in all, this was a fun project, and I hope to do it again in 
+the future.
