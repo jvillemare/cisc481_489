@@ -62,7 +62,7 @@ def possible_actions(stack: List[int]) -> List[int]:
     :param stack: The stack of pancakes.
     :return: List of all actions.
     """
-    actions = list(range(1, len(stack) + 1))
+    actions = list(range(2, len(stack) + 1))
     return actions
 
 

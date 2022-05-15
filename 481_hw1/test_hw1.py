@@ -7,7 +7,7 @@ stack9 = [1, 2, 3]
 class TestHomeworkOne(unittest.TestCase):
     def test_possible_actions(self):
         self.assertEqual(
-            [1, 2, 3],
+            [2, 3],
             hw1.possible_actions([1, 2, 3]),
             'For a stack of 3 pancakes, there is only three possible flips'
         )
@@ -33,7 +33,15 @@ class TestHomeworkOne(unittest.TestCase):
         )
 
     def test_expand(self):
-        self.assertEqual('foo'.upper(), 'FOO')
+        stack9_possible_expands = [
+            [2, 1, 3]
+            [3, 2, 1]
+        ]
+        ex = hw1.expand(stack9)
+        self.assertEqual(
+            stack9_possible_expands,
+            ex
+        )
 
 
 if __name__ == '__main__':
