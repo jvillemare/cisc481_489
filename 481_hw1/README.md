@@ -1,3 +1,0 @@
-# CISC 481 - Homework 1
-
-...
