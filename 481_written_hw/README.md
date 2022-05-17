@@ -9,7 +9,7 @@ Table of Contents:
    - [PDF version](cisc481_hw2_jvillemarette.pdf)
    - [Assignment Instructions](hw2.pdf)
  - [Homework 3 - Manual Bayesian Inference](cisc481_hw3_jvillemarette.docx)
-   - PDF version: Todo
+   - [PDF version](cisc481_hw3_jvillemarette.pdfå)
    - [Assignment Instructions](hw3.pdf)
 
 ## Notes
