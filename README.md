@@ -2,7 +2,8 @@
 
 This repository contains all the work that I did for CISC 481 (Artificial 
 Intelligence) and CISC 489 (Topics in Artificial Intelligence: Multi-agent 
-Systems).
+Systems). This work was done in my final Spring 2022 semester at the 
+University of Delaware.
 
 ## Table of Contents
 
