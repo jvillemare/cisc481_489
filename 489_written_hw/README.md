@@ -12,7 +12,7 @@ Table of Contents:
    - [PDF version](cisc489_hw3_jvillemarette.pdf)
    - [Assignment Instructions](HW3-MAS-2022.pdf)
  - [Homework 4 - Forming Coalitions & Alllocating Scarce Resources](cisc489_hw4_jvillemarette.docx)
-   - PDF version: Todo
+   - [PDF version](cisc489_hw4_jvillemarette.pdf)
    - [Assignment Instructions](HW4-MAS-22.pdf)
 
 ## Notes
