@@ -16,4 +16,4 @@ University of Delaware.
  - **CISC 489: Topics in Artificial Intelligence**
    - [Written Homework Assignments](489_written_hw/README.md) 
    - [Program 1 - Tileworld (Cooperative Agents)](489_program1/README.md)
-   - [Program 2 - Tileworld (Competitive Agents)](489_program2/README.md)
+   - [Program 2 - Tileworld (Competitive Agents)](489_program2/README2.md)
