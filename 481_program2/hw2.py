@@ -236,6 +236,18 @@ class CSP:
         """Return all values for var that aren't currently ruled out."""
         return (self.domains or self.original_domains)[var]
 
+    def restore(self, removals):
+        """Undo a supposition and all inferences from it."""
+        for B, b in removals:
+            self.domains[B].append(b)
+
+    def unassign(self, var, assignment):
+        """Remove {var: val} from assignment.
+        DO NOT call this if you are changing a variable to a new value;
+        just call assign for that."""
+        if var in assignment:
+            del assignment[var]
+
     def goal_test(self, state):
         """
         The goal is to assign all variables, with all constraints satisfied.
@@ -447,7 +459,25 @@ class SudokuCSP(CSP):
         self.neighbors.update({var: {x for x in elements if x != var}})
 
 
-def revise(csp, x_i, x_j) -> bool:
+def revise_check(i, c1, c2, domain):
+    for j in domain:
+        if c1 is not None and [i, j] in c1 or c2 is not None and [i, j] in c2:
+            return True
+    return False
+
+
+def revise_old(csp: CSP, x_i, x_j) -> bool:
+    initial = len(csp.domains[x_i])
+
+    c1 = csp.constraints.get((x_i, x_j))
+    c2 = csp.constraints.get((x_j, x_i))
+    csp.domains[x_i][:] = [
+        i for i in csp.domains[x_i] if revise_check(i, c1, c2, csp.domains[x_j])
+    ]
+    return initial != len(csp.domains[x_i])
+
+
+def revise(csp: CSP, x_i, x_j) -> bool:
     """
     ...?
     :param csp: The CSP problem to search the domains in.
@@ -456,11 +486,15 @@ def revise(csp, x_i, x_j) -> bool:
     :return:
     """
     revised = False
+    if x_i not in csp.domains:
+        return revised
     for x in csp.domains[x_i]:
         # TODO: logic may not work here
         # TODO: make sure not the case that all of them are equal to x
         # TODO: if i can't find a pair, then "i'm not good"
         # Prof. Keffer: looks good! maybe, double check
+        if x_j not in csp.domains:
+            continue
         if all(not x != y for y in csp.domains[x_j]):
             del csp.domains[x_i][csp.domains[x_i].index(x)]
             revised = True
@@ -557,7 +591,9 @@ def backtracking_search(csp):
             return assignment
         var = minimum_remaining_values(csp, assignment)
         for value in order_domain_values(var, assignment, csp):
-            if 0 == csp.nconflicts(var, value, assignment):
+            print('Looking at value =', value)
+            if ac3(csp):
+                print('No conflicts found')
                 csp.assign(var, value, assignment)
                 # below line is supposed to be inferences in pseudocode
                 removals = csp.suppose(var, value)  # inferences is AC3
@@ -568,12 +604,59 @@ def backtracking_search(csp):
                     else:
                         csp.n_bt += 1
                 csp.restore(removals)
+        print('No solution, bouncing out of backtrack')
         csp.unassign(var, assignment)
         return None
 
     result2 = backtrack({})
+    print('result2 =', result2)
     assert result2 is None or csp.goal_test(result2)
     return result2
+
+
+def faulty(csp):
+    """
+    Check if board just doesn't make sense.
+    :param csp:
+    :return:
+    """
+    for x in csp.assignments:
+        csp.domains[x] = csp.assignments[x].copy()
+    return not ac3(csp)
+    return retval
+
+
+def already_complete(csp: CSP):
+    """
+    Check if the board is passed in complete
+    :param csp:
+    :return:
+    """
+    if len(csp.assignments) != len(csp.domain):
+        return False
+    for x in csp.assignments:
+        if csp.assignments[x][0] not in csp.domain[x]:
+            return False
+    return ac3(csp)
+
+
+def backtracking_search_old(csp: CSP):
+    domain_copy = csp.domains.copy()
+    if faulty(csp):
+        return (None, None)
+    if already_complete(csp):
+        return (csp.assignments, [domain_copy])
+    assignments_backups = csp.assignments.copy()
+    smallest_val = minimum_remaining_values(csp, csp)
+    for i in range(len(domain_copy[smallest_val])):
+        possible_candidate = domain_copy[smallest_val][i]
+        assignments_backups[smallest_val] = [possible_candidate]
+
+        back_track_progress, domain_list = backtracking_search(csp)
+        if back_track_progress is not None:
+            domain_list.insert(0, domain_copy)
+            return (back_track_progress, domain_list)
+    return (None, None)
 
 
 # routes

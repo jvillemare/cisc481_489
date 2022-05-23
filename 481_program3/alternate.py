@@ -2,14 +2,10 @@ import sys
 import numpy as np
 import math
 import random
+import copy
 
 
 def toMove(state):
-    """
-    Determine which player's turn it is
-    :param state: The state of the game.
-    :return: A string of which player whose turn it is, 'player1' or 'player2'.
-    """
     # whos moving?
     if state % 2:
         return 'player2'
@@ -17,12 +13,6 @@ def toMove(state):
 
 
 def actions(board, state):
-    """
-    Generate a list of actions based of the current board and state.
-    :param board: The current board.
-    :param state: The current state.
-    :return: List of legal actions.
-    """
     # what moves can you make?
     legals = []
     if state % 2:
@@ -142,22 +132,12 @@ def actions(board, state):
 
 
 def isTerminal(gameDict):
-    """
-    Is the game over at this state?
-    :param gameDict:
-    :return:
-    """
     # is the game over?
     acts = actions(gameDict['board'], gameDict['state'])
     return bool(len(acts))
 
 
 def utility(board):
-    """
-    The
-    :param board:
-    :return:
-    """
     # how did the game end? win (1), loss (0) or draw (1/2)?
     if 1 in board[2]:
         return 1
@@ -179,14 +159,12 @@ def maxVal(gameDict, turn):
     if not isTerminal(gameDict):
         return [utility(gameDict['board']), move]
     for action in actions(gameDict['board'], gameDict['state']):
-        gameDict['board'] = doAction(gameDict['board'], action)
+        gameDict['board'] = result(gameDict['board'], action)
         gameDict['state'] += 1
         recursed = minVal(gameDict, turn)
         if v < recursed[0]:
             v = recursed[0]
             move = action
-            print(v)
-            print(action)
     return [v, move]
 
 
@@ -196,18 +174,16 @@ def minVal(gameDict, turn):
     if not isTerminal(gameDict):
         return [utility(gameDict['board']), move]
     for action in actions(gameDict['board'], gameDict['state']):
-        gameDict['board'] = doAction(gameDict['board'], action)
+        gameDict['board'] = result(gameDict['board'], action)
         gameDict['state'] += 1
         recursed = maxVal(gameDict, turn)
         if v > recursed[0]:
             v = recursed[0]
-            print(v)
             move = action
-            print(action)
     return [v, move]
 
 
-def doAction(board, action):
+def result(board, action):
     action = action.split(' ')[-1].split('-')
     rows = ['a', 'b', 'c']
     cols = ['3', '2', '1']
@@ -224,7 +200,7 @@ def doAction(board, action):
 def makeGraph(nodes1, nodes2):
     graphDict = {}
     for node in nodes1:
-        graphDict[node] = nodes2
+        graphDict[node] = copy.deepcopy(nodes2)
     return graphDict
 
 
@@ -235,8 +211,8 @@ def makeNet(numInputs, numHidden, numOutputs, numLayers):
     for i in range(numLayers - 2):
         hidden.append(list(range(1, numHidden + 1)))
     realHidden = []
-    for h in hidden:
-        realHidden.append(makeGraph(hidden[0], hidden[0]))
+    for j in range(len(hidden)):
+        realHidden.append(makeGraph(hidden[j], hidden[j]))
     net = {"inpWei": makeGraph(inpArr, hidden[0]),
            "outWei": makeGraph(hidden[-1], outArr), "hidWei": realHidden,
            "inpNode": inpArr, "outNode": outArr, "hidNode": hidden}
@@ -246,7 +222,7 @@ def makeNet(numInputs, numHidden, numOutputs, numLayers):
 def initialize(weights):
     for key in weights.keys():
         for i in range(len(weights[key])):
-            weights[key][i] = round(random.uniform(-1, 1), 3)
+            weights[key][i] = round(random.uniform(-2, 2), 3)
     return weights
 
 
@@ -264,11 +240,53 @@ def runClassifySig(network):
     for key in network['inpWei'].keys():
         for i in range(len(network['inpWei'][key])):
             network['inpWei'][key][i] += network['inpNode'][int(key) - 1]
-    for key in network['inpWei'].keys():
-        for i in range(len(network['inpWei'][key])):
-            network['inpWei'][key][i] = 1 / (
-                        1 + math.exp(-network['inpWei'][key][i]))
-    return network
+    netCopy = {}
+    for key in network:
+        netCopy[key] = copy.deepcopy(network[key])
+
+    # initial layer to first hidden
+    for key in netCopy['inpWei'].keys():
+        for i in range(len(netCopy['inpWei'][key])):
+            netCopy['hidNode'][0][i] = sigmoid(netCopy['inpWei'][key][i])
+
+    # hidden to hidden
+    for key in network['hidWei'][0].keys():
+        for j in range(len(network['hidWei'][0][key])):
+            netCopy['hidWei'][0][key][j] += netCopy['hidNode'][0][j]
+    for key in network['hidWei'][0].keys():
+        for j in range(len(network['hidWei'][0][key])):
+            netCopy['hidNode'][1][j] = sigmoid(netCopy['hidWei'][0][key][j])
+
+    for key in network['hidWei'][1].keys():
+        for j in range(len(network['hidWei'][1][key])):
+            netCopy['hidWei'][1][key][j] += netCopy['hidNode'][1][j]
+    for key in network['hidWei'][1].keys():
+        for j in range(len(network['hidWei'][1][key])):
+            netCopy['hidNode'][2][j] = sigmoid(netCopy['hidWei'][1][key][j])
+
+    for key in network['hidWei'][2].keys():
+        for j in range(len(network['hidWei'][2][key])):
+            netCopy['hidWei'][2][key][j] += netCopy['hidNode'][2][j]
+    for key in network['hidWei'][2].keys():
+        for j in range(len(network['hidWei'][2][key])):
+            netCopy['hidNode'][3][j] = sigmoid(netCopy['hidWei'][2][key][j])
+
+    for key in network['hidWei'][3].keys():
+        for j in range(len(network['hidWei'][3][key])):
+            netCopy['hidWei'][3][key][j] += netCopy['hidNode'][3][j]
+    for key in network['hidWei'][2].keys():
+        for j in range(len(network['hidWei'][2][key])):
+            netCopy['outWei'][key][j] = sigmoid(netCopy['hidWei'][3][key][j])
+
+    # hidden final to output
+    for key in network['hidWei'][3].keys():
+        for j in range(len(network['hidWei'][3][key])):
+            netCopy['hidWei'][3][key][j] += netCopy['hidNode'][3][j]
+    for key in network['hidWei'][3].keys():
+        for j in range(len(network['hidWei'][3][key])):
+            netCopy['outNode'][j] = sigmoid(netCopy['hidWei'][3][key][j])
+
+    return netCopy
 
 
 def classifyRelu(network, gameDict):
@@ -285,27 +303,265 @@ def runClassifyRelu(network):
     for key in network['inpWei'].keys():
         for i in range(len(network['inpWei'][key])):
             network['inpWei'][key][i] += network['inpNode'][int(key) - 1]
-    for key in network['inpWei'].keys():
-        for i in range(len(network['inpWei'][key])):
-            network['inpWei'][key][i] = max(network['inpWei'][key][i], 0)
+    netCopy = {}
+    for key in network:
+        netCopy[key] = copy.deepcopy(network[key])
+
+    # initial layer to first hidden
+    for key in netCopy['inpWei'].keys():
+        for i in range(len(netCopy['inpWei'][key])):
+            netCopy['hidNode'][0][i] = relu(netCopy['inpWei'][key][i])
+
+    # hidden to hidden
+    for key in network['hidWei'][0].keys():
+        for j in range(len(network['hidWei'][0][key])):
+            netCopy['hidWei'][0][key][j] += netCopy['hidNode'][0][j]
+    for key in network['hidWei'][0].keys():
+        for j in range(len(network['hidWei'][0][key])):
+            netCopy['hidNode'][1][j] = relu(netCopy['hidWei'][0][key][j])
+
+    for key in network['hidWei'][1].keys():
+        for j in range(len(network['hidWei'][1][key])):
+            netCopy['hidWei'][1][key][j] += netCopy['hidNode'][1][j]
+    for key in network['hidWei'][1].keys():
+        for j in range(len(network['hidWei'][1][key])):
+            netCopy['hidNode'][2][j] = relu(netCopy['hidWei'][1][key][j])
+
+    for key in network['hidWei'][2].keys():
+        for j in range(len(network['hidWei'][2][key])):
+            netCopy['hidWei'][2][key][j] += netCopy['hidNode'][2][j]
+    for key in network['hidWei'][2].keys():
+        for j in range(len(network['hidWei'][2][key])):
+            netCopy['hidNode'][3][j] = relu(netCopy['hidWei'][2][key][j])
+
+    for key in network['hidWei'][3].keys():
+        for j in range(len(network['hidWei'][3][key])):
+            netCopy['hidWei'][3][key][j] += netCopy['hidNode'][3][j]
+    for key in network['hidWei'][2].keys():
+        for j in range(len(network['hidWei'][2][key])):
+            netCopy['outWei'][key][j] = relu(netCopy['hidWei'][3][key][j])
+
+    # hidden final to output
+    for key in network['hidWei'][3].keys():
+        for j in range(len(network['hidWei'][3][key])):
+            netCopy['hidWei'][3][key][j] += netCopy['hidNode'][3][j]
+    for key in network['hidWei'][3].keys():
+        for j in range(len(network['hidWei'][3][key])):
+            netCopy['outNode'][j] = sigmoid(netCopy['hidWei'][3][key][j])
+
+    return netCopy
+
+
+def sigmoid(x):
+    return 1 / (1 + math.exp(-x))
+
+
+def relu(x):
+    return max(x, 0)
+
+
+def backPropSig(network, gameDict):
+    val = minmax(gameDict)
+    if val[1] == None:
+        return network
+    val = val[-1].split(' ')[-1].split('-')[-1]
+    indList = ['c', 'b', 'a']
+    checkList = [0] * 9
+    index = indList.index(val[0]) * 3 + int(val[1]) - 1
+    checkList[index] = 1
+    errorList = []
+    weightList = []
+
+    for i in range(9):
+        weightSum = 0
+        for key in network['hidWei'][3].keys():
+            weightSum += network['hidWei'][3][key][i]
+            weightList.append(weightSum)
+    for i in range(9):
+        error = updateWeightsSig(network['outNode'][i], checkList[i],
+                                 weightList[i])
+        errorList.append(error)
+    for key in network['outWei'].keys():
+        for i in range(9):
+            network['outWei'][key][i] -= errorList[i]
+
+    errorList = []
+    checkList = []
+    for i in range(9):
+        weightSum = 0
+        for key in network['hidWei'][2].keys():
+            weightSum += network['hidWei'][2][key][i]
+            weightList.append(weightSum)
+    for key in network['hidWei'][3].keys():
+        check = 0
+        for j in range(len(network['hidWei'][3][key])):
+            check += network['hidNode'][3][j] - network['hidWei'][3][key][j]
+        checkList.append(check)
+    for i in range(9):
+        error = updateWeightsSig(network['hidNode'][3][i], checkList[i],
+                                 weightList[i])
+        errorList.append(error)
+    for key in network['hidWei'][3].keys():
+        for j in range(len(network['hidWei'][3][key])):
+            network['hidNode'][3][j] -= errorList[j]
+
+    errorList = []
+    checkList = []
+    for i in range(9):
+        weightSum = 0
+        for key in network['hidWei'][2].keys():
+            weightSum += network['hidWei'][1][key][i]
+            weightList.append(weightSum)
+    for key in network['hidWei'][3].keys():
+        check = 0
+        for j in range(len(network['hidWei'][3][key])):
+            check += network['hidNode'][2][j] - network['hidWei'][2][key][j]
+        checkList.append(check)
+    for i in range(9):
+        error = updateWeightsSig(network['hidNode'][2][i], checkList[i],
+                                 weightList[i])
+        errorList.append(error)
+    for key in network['hidWei'][3].keys():
+        for j in range(len(network['hidWei'][2][key])):
+            network['hidNode'][2][j] -= errorList[j]
+
+    errorList = []
+    checkList = []
+    for i in range(9):
+        weightSum = 0
+        for key in network['hidWei'][2].keys():
+            weightSum += network['hidWei'][0][key][i]
+            weightList.append(weightSum)
+    for key in network['hidWei'][3].keys():
+        check = 0
+        for j in range(len(network['hidWei'][3][key])):
+            check += network['hidNode'][1][j] - network['hidWei'][1][key][j]
+        checkList.append(check)
+    for i in range(9):
+        error = updateWeightsSig(network['hidNode'][1][i], checkList[i],
+                                 weightList[i])
+        errorList.append(error)
+    for key in network['hidWei'][3].keys():
+        for j in range(len(network['hidWei'][2][key])):
+            network['hidNode'][1][j] -= errorList[j]
+
     return network
+
+
+def backPropRelu(network, gameDict):
+    val = minmax(gameDict)
+    if val[1] == None:
+        return network
+
+    val = val[-1].split(' ')[-1].split('-')[-1]
+    indList = ['c', 'b', 'a']
+    checkList = [0] * 9
+    index = indList.index(val[0]) * 3 + int(val[1]) - 1
+    checkList[index] = 1
+    errorList = []
+    weightList = []
+
+    for i in range(9):
+        weightSum = 0
+        for key in network['hidWei'][3].keys():
+            weightSum += network['hidWei'][3][key][i]
+            weightList.append(weightSum)
+    for i in range(9):
+        error = updateWeightsRelu(network['outNode'][i])
+        errorList.append(error)
+    for key in network['outWei'].keys():
+        for i in range(9):
+            network['outWei'][key][i] -= errorList[i]
+
+    errorList = []
+    checkList = []
+    for i in range(9):
+        weightSum = 0
+        for key in network['hidWei'][2].keys():
+            weightSum += network['hidWei'][2][key][i]
+            weightList.append(weightSum)
+    for key in network['hidWei'][3].keys():
+        check = 0
+        for j in range(len(network['hidWei'][3][key])):
+            check += network['hidNode'][3][j] - network['hidWei'][3][key][j]
+        checkList.append(check)
+    for i in range(9):
+        error = updateWeightsRelu(network['hidNode'][3][i])
+        errorList.append(error)
+    for key in network['hidWei'][3].keys():
+        for j in range(len(network['hidWei'][3][key])):
+            network['hidNode'][3][j] -= errorList[j]
+
+    errorList = []
+    checkList = []
+    for i in range(9):
+        weightSum = 0
+        for key in network['hidWei'][2].keys():
+            weightSum += network['hidWei'][1][key][i]
+            weightList.append(weightSum)
+    for key in network['hidWei'][3].keys():
+        check = 0
+        for j in range(len(network['hidWei'][3][key])):
+            check += network['hidNode'][2][j] - network['hidWei'][2][key][j]
+        checkList.append(check)
+    for i in range(9):
+        error = updateWeightsRelu(network['hidNode'][2][i])
+        errorList.append(error)
+    for key in network['hidWei'][3].keys():
+        for j in range(len(network['hidWei'][2][key])):
+            network['hidNode'][2][j] -= errorList[j]
+
+    errorList = []
+    checkList = []
+    for i in range(9):
+        weightSum = 0
+        for key in network['hidWei'][2].keys():
+            weightSum += network['hidWei'][0][key][i]
+            weightList.append(weightSum)
+    for key in network['hidWei'][3].keys():
+        check = 0
+        for j in range(len(network['hidWei'][3][key])):
+            check += network['hidNode'][1][j] - network['hidWei'][1][key][j]
+        checkList.append(check)
+    for i in range(9):
+        error = updateWeightsRelu(network['hidNode'][1][i])
+        errorList.append(error)
+    for key in network['hidWei'][3].keys():
+        for j in range(len(network['hidWei'][2][key])):
+            network['hidNode'][1][j] -= errorList[j]
+
+    return network
+
+
+def updateWeightsSig(actual, expected, weighted_sum):
+    weighted_sum = sigmoid(weighted_sum)
+    return (2 * (actual - expected) * (
+                sigmoid(weighted_sum) * (1 - sigmoid(weighted_sum))))
+
+
+def updateWeightsRelu(actual):
+    if actual < 0:
+        return 0
+    return 1
 
 
 def main():
     # -1 = white; 1 = black; 0 = blank space
     gameDict = {'board': [[1, 1, 1], [0, 0, 0], [-1, -1, -1]],
-                'state': 4}
-
-    testDict = {'board': [[1, 1, 1], [0, 0, 0], [-1, -1, -1]],
                 'state': 0}
 
-    netDict = makeNet(10, 15, 9, 6)
-    classifiedSig = classifySig(netDict, gameDict)
-    print(classifiedSig['inpWei'])
-    classifiedRelu = classifyRelu(netDict, gameDict)
-    print(classifiedRelu['inpWei'])
+    classifiedSig = makeNet(10, 9, 9, 6)
+    classifiedRelu = makeNet(10, 9, 9, 6)
 
-    # print(initialize(netDict['inpWei']))
+    for i in range(1000):
+        classifiedSig = classifySig(classifiedSig, gameDict)
+        classifiedRelu = classifyRelu(classifiedRelu, gameDict)
+
+        classifiedSig = backPropSig(classifiedSig, gameDict)
+        classifiedRelu = backPropRelu(classifiedRelu, gameDict)
+
+    print(classifiedSig['outNode'])
+    print(classifiedRelu['outNode'])
 
 
 if __name__ == '__main__':
