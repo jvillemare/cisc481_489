@@ -15,8 +15,6 @@ pancakes and turning over, as a block, the pancakes above the spatula.
 # imports
 from memory_profiler import profile         # for profiling the functions
 from typing import List                     # for type hinting
-import tqdm                                 # for pretty progress bars
-import itertools                            # for calculating permutations of stack
 import sys                                  # for bypassing recursion limit
 
 sys.setrecursionlimit(1500)
@@ -31,6 +29,19 @@ stack5 = [6, 9, 4, 8, 1, 3, 2, 7, 10, 5]
 stack6 = [8, 5, 10, 6, 2, 9, 3, 4, 1, 7]
 stack7 = [8, 1, 10, 5, 3, 7, 4, 9, 2, 6]
 stack8 = [1, 2, 3]
+
+stack0_goal = [1, 2, 3, 4, 5, 6]
+stack1_7_goals = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+stacks1_7 = {
+    'stack1': stack1,
+    'stack2': stack2,
+    'stack3': stack3,
+    'stack4': stack4,
+    'stack5': stack5,
+    'stack6': stack6,
+    'stack7': stack7
+}
 
 
 class Pancake:
@@ -143,13 +154,16 @@ def expand(state: Pancake) -> List[Pancake]:
     pa = possible_actions(state.stack)
     possible_states = []
     for act in pa:
-        possible_states.append( result(act, state.stack) )
+        if act != state.action:  # don't do the same thing twice
+            possible_states.append(
+                Pancake(result(act, state.stack), act, state)
+            )
     return possible_states
 
 # Part 4 - IDS
 
 
-#@profile
+@profile
 def iterative_deepening_search(initial_stack: List[int], goal_stack: List[int]) -> List[int]:
     """
     Takes an initial stack and a goal stack and produces a list of actions that
@@ -159,12 +173,13 @@ def iterative_deepening_search(initial_stack: List[int], goal_stack: List[int]) 
     :return: List of actions.
     """
     temp_state = Pancake(initial_stack, None, None)
-    pancake_lists = expand(initial_stack)
+    pancake_lists = expand(temp_state)
     max_depth = len(initial_stack)
     optimal = temp_state
 
     checked = []
-    while True:
+    keep_looking = True
+    while keep_looking:
         for stack in pancake_lists:
             # no double checking, no too deep search
             if (stack not in checked) and (stack.depth < max_depth):
@@ -175,10 +190,10 @@ def iterative_deepening_search(initial_stack: List[int], goal_stack: List[int]) 
                     max_depth = temp_state.depth
                     # break
                 if temp_state.depth < max_depth:
-                    pancake_lists = expand(temp_state.stack) + pancake_lists
+                    pancake_lists = expand(temp_state) + pancake_lists
                     break
                 print('len(pancake_lists) =', len(pancake_lists))
-                break
+                keep_looking = False
 
     good_actions = []
     while optimal.parent is not None:
@@ -204,7 +219,7 @@ def iterative_deepening_search(initial_stack: List[int], goal_stack: List[int]) 
     #         return dls_result
 
 
-#@profile
+@profile
 def depth_limited_search(initial_stack: List[int], goal_stack: List[int], depth: int):
     """
     No longer used. This was going to be for an approach on iterative
@@ -281,23 +296,34 @@ def breadth_first_search(initial_stack: List[int], goal_stack: List[int]) -> Lis
                 search_next = search_next + more_temp_state
                 checked.append(pancake_looper.stack)
         pancake_lists = list(set(search_next)) # remove duplicated
-    print(temp_state.action)
-    return temp_state.action
+    ze_actions = []
+    while temp_state.parent is not None:
+        ze_actions.insert(0, temp_state.action)
+        temp_state = temp_state.parent
+    return ze_actions
 
 # Part 6 - A* Search
 
 
-# Heuristic cost of A* search
-def heuristic(pancake):
+def a_star_heuristic(pancake):
+    """
+    Calculate the heuristic cost of A* search.
+    :param pancake:
+    :return:
+    """
     if pancake.parent is not None:
         pancake.cost += pancake.parent.cost
-
     i = 0
     while i < len(pancake.stack) - 2:
         if abs(pancake.stack[i] - pancake.stack[i + 1]) != 1:
             pancake.cost += 1
         i += 1
     return pancake
+
+
+def sort_pancake_cost(p: Pancake) -> int:
+    """Sort function, just return the cost."""
+    return p.cost
 
 
 @profile
@@ -315,33 +341,63 @@ def a_star_search(initial_stack: List[int], goal_stack: List[int]) -> List[int]:
     :param goal_stack:
     :return:
     """
-    tempState = heuristic(Pancake(initialState, None, None))
-    pancakeList = []
-    while tempState.stack != goalState:
-        tempList = []
-        for pancake in expandNode(tempState):
-            tempList.append(heuristic(pancake))
+    temp_state = a_star_heuristic(Pancake(initial_stack, None, None))
+    pancake_lists = []
+    while temp_state.stack != goal_stack:
+        temp_list = []
+        for pancake in expand(temp_state):
+            temp_list.append(a_star_heuristic(pancake))
 
-        if tempState.depth < len(initialState):
-            pancakeList = pancakeList + tempList
-            pancakeList.sort(key=sortFunc)
+        if temp_state.depth < len(initial_stack):
+            pancake_lists = pancake_lists + temp_list
+            pancake_lists.sort(key=sort_pancake_cost)
 
-            tempState = pancakeList[0]
-            pancakeList.pop(0)
+            temp_state = pancake_lists[0]
+            pancake_lists.pop(0)
         else:
-            tempState = pancakeList[0]
-    print(
-        len(pancakeList))  # Size of the pancakeList, used as a way to measure memory
-    actionList = []
-    while tempState.parent is not None:
-        actionList.insert(0, tempState.action)
-        tempState = tempState.parent
-    print(actionList)
-    return actionList
+            temp_state = pancake_lists[0]
+    print('pancake_lists =', len(pancake_lists))
+    ze_actions = []
+    while temp_state.parent is not None:
+        ze_actions.insert(0, temp_state.action)
+        temp_state = temp_state.parent
+    return ze_actions
+
+
+@profile
+def main():
+    print('=' * 80)
+    print('iterative_deepening_search')
+    solution = iterative_deepening_search(stack0, stack0_goal)
+    print('stack0 =', stack0, 'stack0_goal =', stack0_goal, 'solution =',
+        solution)
+    """
+    for s in stacks1_7:
+        solution = iterative_deepening_search(stacks1_7[s], stack1_7_goals)
+        print(
+            'stack =', s,
+            'initial_stack =',
+            stacks1_7[s],
+            'goal_stack =',
+            stack1_7_goals,
+            'solution =',
+            solution
+        )
+    """
+    print('=' * 80)
+    print('breadth_first_search')
+    solution = breadth_first_search(stack0, stack0_goal)
+    print('stack0 =', stack0, 'stack0_goal =', stack0_goal, 'solution =',
+          solution)
+    # solution = breadth_first_search(stack1, stack1_7_goals)
+    # print('stack1 =', stack1, 'stack1_goal =', stack1_7_goals, 'solution =',
+    #      solution)
+    print('=' * 80)
+    print('a_star_search')
+    solution = a_star_search(stack0, stack0_goal)
+    print('stack0 =', stack0, 'stack0_goal =', stack0_goal, 'solution =',
+          solution)
 
 
 if __name__ == '__main__':
-    stack0_goal = [1, 2, 3, 4, 5, 6]
-    print(
-        iterative_deepening_search(stack0, stack0_goal)
-    )
+    main()

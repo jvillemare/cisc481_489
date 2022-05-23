@@ -1,8 +1,15 @@
 import sys
 import numpy as np
+import math
+import random
 
 
 def toMove(state):
+    """
+    Determine which player's turn it is
+    :param state: The state of the game.
+    :return: A string of which player whose turn it is, 'player1' or 'player2'.
+    """
     # whos moving?
     if state % 2:
         return 'player2'
@@ -10,6 +17,12 @@ def toMove(state):
 
 
 def actions(board, state):
+    """
+    Generate a list of actions based of the current board and state.
+    :param board: The current board.
+    :param state: The current state.
+    :return: List of legal actions.
+    """
     # what moves can you make?
     legals = []
     if state % 2:
@@ -128,18 +141,23 @@ def actions(board, state):
     return legals
 
 
-def result(board, state):
-    # what happens if you make that move?
-    return
-
-
 def isTerminal(gameDict):
+    """
+    Is the game over at this state?
+    :param gameDict:
+    :return:
+    """
     # is the game over?
     acts = actions(gameDict['board'], gameDict['state'])
     return bool(len(acts))
 
 
 def utility(board):
+    """
+    The
+    :param board:
+    :return:
+    """
     # how did the game end? win (1), loss (0) or draw (1/2)?
     if 1 in board[2]:
         return 1
@@ -219,20 +237,75 @@ def makeNet(numInputs, numHidden, numOutputs, numLayers):
     realHidden = []
     for h in hidden:
         realHidden.append(makeGraph(hidden[0], hidden[0]))
-    net = {"inputs": makeGraph(inpArr, hidden[0]),
-           "outputs": makeGraph(hidden[-1], outArr), "hidden": realHidden}
+    net = {"inpWei": makeGraph(inpArr, hidden[0]),
+           "outWei": makeGraph(hidden[-1], outArr), "hidWei": realHidden,
+           "inpNode": inpArr, "outNode": outArr, "hidNode": hidden}
     return net
+
+
+def initialize(weights):
+    for key in weights.keys():
+        for i in range(len(weights[key])):
+            weights[key][i] = round(random.uniform(-1, 1), 3)
+    return weights
+
+
+def classifySig(network, gameDict):
+    network['inpNode'][0] = gameDict['state']
+    for i in range(9):
+        network['inpNode'][i + 1] = gameDict['board'][math.trunc(i / 3)][i % 3]
+    network['inpWei'] = initialize(network['inpWei'])
+    for i in range(len(network['hidWei'])):
+        network['hidWei'][i] = initialize(network['hidWei'][i])
+    return runClassifySig(network)
+
+
+def runClassifySig(network):
+    for key in network['inpWei'].keys():
+        for i in range(len(network['inpWei'][key])):
+            network['inpWei'][key][i] += network['inpNode'][int(key) - 1]
+    for key in network['inpWei'].keys():
+        for i in range(len(network['inpWei'][key])):
+            network['inpWei'][key][i] = 1 / (
+                        1 + math.exp(-network['inpWei'][key][i]))
+    return network
+
+
+def classifyRelu(network, gameDict):
+    network['inpNode'][0] = gameDict['state']
+    for i in range(9):
+        network['inpNode'][i + 1] = gameDict['board'][math.trunc(i / 3)][i % 3]
+    network['inpWei'] = initialize(network['inpWei'])
+    for i in range(len(network['hidWei'])):
+        network['hidWei'][i] = initialize(network['hidWei'][i])
+    return runClassifyRelu(network)
+
+
+def runClassifyRelu(network):
+    for key in network['inpWei'].keys():
+        for i in range(len(network['inpWei'][key])):
+            network['inpWei'][key][i] += network['inpNode'][int(key) - 1]
+    for key in network['inpWei'].keys():
+        for i in range(len(network['inpWei'][key])):
+            network['inpWei'][key][i] = max(network['inpWei'][key][i], 0)
+    return network
 
 
 def main():
     # -1 = white; 1 = black; 0 = blank space
     gameDict = {'board': [[1, 1, 1], [0, 0, 0], [-1, -1, -1]],
-                'state': 0}
+                'state': 4}
 
     testDict = {'board': [[1, 1, 1], [0, 0, 0], [-1, -1, -1]],
                 'state': 0}
 
-    print(makeNet(4, 7, 2, 5))
+    netDict = makeNet(10, 15, 9, 6)
+    classifiedSig = classifySig(netDict, gameDict)
+    print(classifiedSig['inpWei'])
+    classifiedRelu = classifyRelu(netDict, gameDict)
+    print(classifiedRelu['inpWei'])
+
+    # print(initialize(netDict['inpWei']))
 
 
 if __name__ == '__main__':
