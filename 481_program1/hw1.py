@@ -32,6 +32,53 @@ stack6 = [8, 5, 10, 6, 2, 9, 3, 4, 1, 7]
 stack7 = [8, 1, 10, 5, 3, 7, 4, 9, 2, 6]
 stack8 = [1, 2, 3]
 
+
+class Pancake:
+    """
+    A pancake.
+    """
+
+    stack: List[int]
+    """
+    List of ints, where the value refers to the size of the pancake in the 
+    stack.
+    """
+
+    action: str
+    """
+    The action applied to make this stack.
+    """
+
+    parent = None
+    """
+    The stack before this one.
+    """
+
+    cost: int
+    """
+    How long it took to get here.
+    """
+
+    depth: int
+    """
+    How far we made it.
+    """
+
+    """
+    Hold all the important shiz.
+    """
+    def __init__(self, stack, action, parent):
+        self.stack = stack
+        self.action = action
+        self.parent = parent
+        self.cost = 0
+
+        if parent is not None:
+            self.depth = parent.depth + 1
+        else:
+            self.depth = 0
+
+
 # helper functions
 
 
@@ -86,17 +133,17 @@ def result(action: int, stack: List[int]) -> List[int]:
 
 
 #@profile
-def expand(stack: List[int]) -> List[List[int]]:
+def expand(state: Pancake) -> List[Pancake]:
     """
     Takes a stack as input, and outputs a list of all states that can be reached
     in one Action from the given state.
-    :param stack: The stack of pancakes.
+    :param state: The state containing the stack of pancakes.
     :return: A list, containing lists that are the states that can be reached.
     """
-    pa = possible_actions(stack)
+    pa = possible_actions(state.stack)
     possible_states = []
     for act in pa:
-        possible_states.append( result(act, stack) )
+        possible_states.append( result(act, state.stack) )
     return possible_states
 
 # Part 4 - IDS
@@ -111,10 +158,40 @@ def iterative_deepening_search(initial_stack: List[int], goal_stack: List[int]) 
     :param goal_stack: The goal stack of pancakes.
     :return: List of actions.
     """
+    temp_state = Pancake(initial_stack, None, None)
+    pancake_lists = expand(initial_stack)
+    max_depth = len(initial_stack)
+    optimal = temp_state
+
+    checked = []
+    while True:
+        for stack in pancake_lists:
+            # no double checking, no too deep search
+            if (stack not in checked) and (stack.depth < max_depth):
+                checked.append(stack)
+                temp_state = stack
+                if temp_state.stack == goal_stack:
+                    optimal = temp_state
+                    max_depth = temp_state.depth
+                    # break
+                if temp_state.depth < max_depth:
+                    pancake_lists = expand(temp_state.stack) + pancake_lists
+                    break
+                print('len(pancake_lists) =', len(pancake_lists))
+                break
+
+    good_actions = []
+    while optimal.parent is not None:
+        good_actions.insert(0, optimal.action)
+        optimal = optimal.parent
+
+    return good_actions
+    """
     for cur_depth in range(0, sys.maxsize):
         dls_result = depth_limited_search(initial_stack, goal_stack, cur_depth)
         if dls_result == goal_stack:
             return dls_result
+    """
     # ==========================================================================
     # for i in range(25):
     #     if depth_limited_search(initial_stack, goal_stack, i):
@@ -129,6 +206,14 @@ def iterative_deepening_search(initial_stack: List[int], goal_stack: List[int]) 
 
 #@profile
 def depth_limited_search(initial_stack: List[int], goal_stack: List[int], depth: int):
+    """
+    No longer used. This was going to be for an approach on iterative
+    deepening search that turnedo ut to be fruitless.
+    :param initial_stack:
+    :param goal_stack:
+    :param depth:
+    :return:
+    """
     frontier = [initial_stack]
     if depth % 100 == 0:
         print('len(frontier): ', len(frontier), ', goal: ', goal_stack, ', depth: ', depth)
@@ -181,19 +266,78 @@ def breadth_first_search(initial_stack: List[int], goal_stack: List[int]) -> Lis
     :param goal_stack:
     :return:
     """
-    return ''
+    temp_state = Pancake(initial_stack, None, None)
+    pancake_lists = [temp_state]
+    checked = []
+    while temp_state.stack != goal_stack:
+        search_next = []  # stop double searches
+        for pancake_looper in pancake_lists:
+            if pancake_looper.stack not in checked:
+                temp_state = pancake_looper
+                if temp_state.stack == goal_stack:
+                    print('pancake_lists =', len(pancake_lists))
+                    break
+                more_temp_state = expand(temp_state)
+                search_next = search_next + more_temp_state
+                checked.append(pancake_looper.stack)
+        pancake_lists = list(set(search_next)) # remove duplicated
+    print(temp_state.action)
+    return temp_state.action
 
 # Part 6 - A* Search
+
+
+# Heuristic cost of A* search
+def heuristic(pancake):
+    if pancake.parent is not None:
+        pancake.cost += pancake.parent.cost
+
+    i = 0
+    while i < len(pancake.stack) - 2:
+        if abs(pancake.stack[i] - pancake.stack[i + 1]) != 1:
+            pancake.cost += 1
+        i += 1
+    return pancake
 
 
 @profile
 def a_star_search(initial_stack: List[int], goal_stack: List[int]) -> List[int]:
     """
+    Similar to breadth-first and iterative deepening, your A* search should take
+    as input an initial stack and a goal stack. It should additionally take a
+    heuristic function
 
+    You can test your code by passing as the heuristic a function that always
+    returns, which should reduce your search to uniform-cost search. Test it on
+    *stack-0*. You can also try it on *stack-1* for good measure. It may take a
+    long time to solve any of the other.
     :param initial_stack:
     :param goal_stack:
     :return:
     """
+    tempState = heuristic(Pancake(initialState, None, None))
+    pancakeList = []
+    while tempState.stack != goalState:
+        tempList = []
+        for pancake in expandNode(tempState):
+            tempList.append(heuristic(pancake))
+
+        if tempState.depth < len(initialState):
+            pancakeList = pancakeList + tempList
+            pancakeList.sort(key=sortFunc)
+
+            tempState = pancakeList[0]
+            pancakeList.pop(0)
+        else:
+            tempState = pancakeList[0]
+    print(
+        len(pancakeList))  # Size of the pancakeList, used as a way to measure memory
+    actionList = []
+    while tempState.parent is not None:
+        actionList.insert(0, tempState.action)
+        tempState = tempState.parent
+    print(actionList)
+    return actionList
 
 
 if __name__ == '__main__':
