@@ -10,3 +10,5 @@ def relu(x):
         return 0
     else:
         1
+
+# yeah nvm
